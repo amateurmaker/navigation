@@ -363,6 +363,14 @@ void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_ya
   {
     raytraceFreespace(clearing_observations[i], min_x, min_y, max_x, max_y);
   }
+  
+  // before adding new obstacles clear all previous cost from the previous cycle to prevent persistence 
+  // TODO: Check if code works 
+  int max_indices_in_costmap = int(getSizeInMetersX()/getResolution()) * int(getSizeInMetersX()/getResolution()); 
+  for (int i=0; i < max_indices_in_costmap; i++)
+  {
+    costmap_[index] = FREE_SPACE;
+  }
 
   // place the new obstacles into a priority queue... each with a priority of zero to begin with
   for (std::vector<Observation>::const_iterator it = observations.begin(); it != observations.end(); ++it)
