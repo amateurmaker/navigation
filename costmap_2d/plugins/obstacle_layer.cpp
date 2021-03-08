@@ -73,7 +73,7 @@ void ObstacleLayer::onInitialize()
   std::string topics_string;
   // get the topics that we'll subscribe to from the parameter server
   nh.param("observation_sources", topics_string, std::string(""));
-  ROS_INFO("    Subscribed to Topics: %s", topics_string.c_str());
+  ROS_INFO("Subscribed to Topics: %s", topics_string.c_str());
 
   // get our tf prefix
   ros::NodeHandle prefix_nh;
@@ -366,7 +366,7 @@ void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_ya
   
   // before adding new obstacles clear all previous cost from the previous cycle to prevent persistence 
   // TODO: Check if code works 
-  int max_indices_in_costmap = int(getSizeInMetersX()/getResolution()) * int(getSizeInMetersX()/getResolution()); 
+  int max_indices_in_costmap = getSizeInCellsX() * getSizeInCellsY(); 
   for (int i=0; i < max_indices_in_costmap; i++)
   {
     costmap_[index] = FREE_SPACE;
