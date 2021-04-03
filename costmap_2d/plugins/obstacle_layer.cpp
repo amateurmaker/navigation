@@ -369,7 +369,7 @@ void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_ya
   int max_indices_in_costmap = getSizeInCellsX() * getSizeInCellsY(); 
   for (int i=0; i < max_indices_in_costmap; i++)
   {
-    costmap_[index] = FREE_SPACE;
+    costmap_[i] = FREE_SPACE;
   }
 
   // place the new obstacles into a priority queue... each with a priority of zero to begin with
