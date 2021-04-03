@@ -49,6 +49,7 @@
 #include "nav_msgs/GetMap.h"
 #include "nav_msgs/SetMap.h"
 #include "std_srvs/Empty.h"
+#include "std_srvs/SetBool.h"
 
 // For transform support
 #include "tf/transform_broadcaster.h"
@@ -153,8 +154,8 @@ class AmclNode
                                     std_srvs::Empty::Response& res);
     bool setMapCallback(nav_msgs::SetMap::Request& req,
                         nav_msgs::SetMap::Response& res);
-    bool statictfcallback(std_srvs::Empty::Request& req,
-                                    std_srvs::Empty::Response& res); 
+    bool statictfcallback(std_srvs::SetBool::Request& req,
+                                     std_srvs::SetBool::Response& res);
 
     void laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan);
     void initialPoseReceived(const geometry_msgs::PoseWithCovarianceStampedConstPtr& msg);
@@ -440,7 +441,7 @@ AmclNode::AmclNode() :
                                          this);
 
   static_tf_srv_ = nh_.advertiseService("static_tf", 
-					 &AmclNode::statictfCallback,
+					 &AmclNode::statictfcallback,
                                          this);
   nomotion_update_srv_= nh_.advertiseService("request_nomotion_update", &AmclNode::nomotionUpdateCallback, this);
   set_map_srv_= nh_.advertiseService("set_map", &AmclNode::setMapCallback, this);
@@ -1038,17 +1039,20 @@ AmclNode::globalLocalizationCallback(std_srvs::Empty::Request& req,
   return true;
 }
 
-
-AmclNode::statictfcallback(std_srvs::Empty::Request& req,
-                                     std_srvs::Empty::Response& res)
+bool
+AmclNode::statictfcallback(std_srvs::SetBool::Request& req,
+                                     std_srvs::SetBool::Response& res)
 {
   ROS_INFO("Initializing with uniform distribution");
   if(req.data)
   {
 	  use_static_tf_ = true; 
+	  res.message = "set to true";
   } else {
   use_static_tf_ = false; 
+  res.message = "set to false";
   }
+  res.success=true; 
   return true;
 }
 
