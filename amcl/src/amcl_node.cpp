@@ -136,6 +136,9 @@ class AmclNode
 
     tf::Transform latest_tf_;
     bool latest_tf_valid_;
+	
+    //For delocalisation purposes, switch to pure odom and retain a static map-->odom transform
+    tf::Transform saved_tf_;
 
     // Pose-generating function used to uniformly distribute particles over
     // the map
@@ -150,6 +153,8 @@ class AmclNode
                                     std_srvs::Empty::Response& res);
     bool setMapCallback(nav_msgs::SetMap::Request& req,
                         nav_msgs::SetMap::Response& res);
+    bool statictfcallback(std_srvs::Empty::Request& req,
+                                    std_srvs::Empty::Response& res); 
 
     void laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan);
     void initialPoseReceived(const geometry_msgs::PoseWithCovarianceStampedConstPtr& msg);
@@ -176,6 +181,7 @@ class AmclNode
 
     bool use_map_topic_;
     bool first_map_only_;
+    bool use_static_tf_; 
 
     ros::Duration gui_publish_period;
     ros::Time save_pose_last_time;
@@ -236,6 +242,7 @@ class AmclNode
     ros::ServiceServer global_loc_srv_;
     ros::ServiceServer nomotion_update_srv_; //to let amcl update samples without requiring motion
     ros::ServiceServer set_map_srv_;
+	ros::ServiceServer static_tf_srv_;
     ros::Subscriber initial_pose_sub_old_;
     ros::Subscriber map_sub_;
 
@@ -430,6 +437,10 @@ AmclNode::AmclNode() :
   particlecloud_pub_ = nh_.advertise<geometry_msgs::PoseArray>("particlecloud", 2, true);
   global_loc_srv_ = nh_.advertiseService("global_localization", 
 					 &AmclNode::globalLocalizationCallback,
+                                         this);
+
+  static_tf_srv_ = nh_.advertiseService("static_tf", 
+					 &AmclNode::statictfCallback,
                                          this);
   nomotion_update_srv_= nh_.advertiseService("request_nomotion_update", &AmclNode::nomotionUpdateCallback, this);
   set_map_srv_= nh_.advertiseService("set_map", &AmclNode::setMapCallback, this);
@@ -1027,6 +1038,20 @@ AmclNode::globalLocalizationCallback(std_srvs::Empty::Request& req,
   return true;
 }
 
+
+AmclNode::statictfcallback(std_srvs::Empty::Request& req,
+                                     std_srvs::Empty::Response& res)
+{
+  ROS_INFO("Initializing with uniform distribution");
+  if(req.data)
+  {
+	  use_static_tf_ = true; 
+  } else {
+  use_static_tf_ = false; 
+  }
+  return true;
+}
+
 // force nomotion updates (amcl updating without requiring motion)
 bool 
 AmclNode::nomotionUpdateCallback(std_srvs::Empty::Request& req,
@@ -1297,8 +1322,29 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
         max_weight_hyp = hyp_count;
       }
     }
+      if(use_static_tf_)
+	{
+	if (tf_broadcast_ == true)
+	{
+	// let's try using a static tf
+	ros::Time transform_expiration = (laser_scan->header.stamp +
+					transform_tolerance_);
+	tf::StampedTransform tmp_tf_stamped(saved_tf_.inverse(),
+					  transform_expiration,
+					  global_frame_id_, odom_frame_id_);
+	this->tfb_->sendTransform(tmp_tf_stamped);
+	}
 
-    if(max_weight > 0.0)
+	// Is it time to save our last pose to the param server
+	ros::Time now = ros::Time::now();
+	if((save_pose_period.toSec() > 0.0) &&
+	(now - save_pose_last_time) >= save_pose_period)
+	{
+	this->savePoseToServer();
+	save_pose_last_time = now;
+	}
+	}
+    else if(max_weight > 0.0)
     {
       ROS_DEBUG("Max weight pose: %.3f %.3f %.3f",
                 hyps[max_weight_hyp].pf_pose_mean.v[0],
@@ -1390,6 +1436,7 @@ AmclNode::laserReceived(const sensor_msgs::LaserScanConstPtr& laser_scan)
                                             transform_expiration,
                                             global_frame_id_, odom_frame_id_);
         this->tfb_->sendTransform(tmp_tf_stamped);
+	saved_tf_ = latest_tf_;
         sent_first_transform_ = true;
       }
     }
